@@ -96,10 +96,16 @@
 #define ARM_SMMU_GR0_SMR(n)		(0x800 + ((n) << 2))
 #define SMR_VALID			BIT(31)
 #define SMR_MASK			GENMASK(31, 16)
+#define SMR_MASK_SHIFT			16
+#define SMR_MASK_MASK			0x7fff
 #define SMR_ID				GENMASK(15, 0)
+#define SMR_ID_SHIFT			0
+#define SMR_ID_MASK			0xffff
 
 #define ARM_SMMU_GR0_S2CR(n)		(0xc00 + ((n) << 2))
 #define S2CR_PRIVCFG			GENMASK(25, 24)
+#define S2CR_PRIVCFG_SHIFT		24
+#define S2CR_PRIVCFG_MASK		0x3
 enum arm_smmu_s2cr_privcfg {
 	S2CR_PRIVCFG_DEFAULT,
 	S2CR_PRIVCFG_DIPAN,
@@ -107,6 +113,10 @@ enum arm_smmu_s2cr_privcfg {
 	S2CR_PRIVCFG_PRIV,
 };
 #define S2CR_TYPE			GENMASK(17, 16)
+#define S2CR_CBNDX_SHIFT		0
+#define S2CR_CBNDX_MASK			0xff
+#define S2CR_TYPE_SHIFT			16
+#define S2CR_TYPE_MASK			0x3
 enum arm_smmu_s2cr_type {
 	S2CR_TYPE_TRANS,
 	S2CR_TYPE_BYPASS,

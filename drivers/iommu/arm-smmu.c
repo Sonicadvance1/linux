@@ -78,6 +78,7 @@ struct arm_smmu_s2cr {
 	enum arm_smmu_s2cr_type		type;
 	enum arm_smmu_s2cr_privcfg	privcfg;
 	u8				cbndx;
+	bool				handoff;
 };
 
 #define s2cr_init_val (struct arm_smmu_s2cr){				\
@@ -219,9 +220,22 @@ static int arm_smmu_register_legacy_master(struct device *dev,
 	return err;
 }
 
-static int __arm_smmu_alloc_bitmap(unsigned long *map, int start, int end)
+static int __arm_smmu_alloc_cb(struct arm_smmu_device *smmu, int start,
+			       struct device *dev)
 {
+	struct iommu_fwspec *fwspec = dev_iommu_fwspec_get(dev);
+	unsigned long *map = smmu->context_map;
+	int end = smmu->num_context_banks;
+	int cbndx;
 	int idx;
+	int i;
+
+	for_each_cfg_sme(fwspec, i, idx) {
+		if (smmu->s2crs[idx].handoff) {
+			cbndx = smmu->s2crs[idx].cbndx;
+			goto found_handoff;
+		}
+	}
 
 	do {
 		idx = find_next_zero_bit(map, end, start);
@@ -230,6 +244,18 @@ static int __arm_smmu_alloc_bitmap(unsigned long *map, int start, int end)
 	} while (test_and_set_bit(idx, map));
 
 	return idx;
+
+found_handoff:
+
+	for (i = 0; i < smmu->num_mapping_groups; i++) {
+		if (smmu->s2crs[i].cbndx == cbndx) {
+			smmu->s2crs[i].cbndx = 0;
+			smmu->s2crs[i].handoff = false;
+			smmu->s2crs[i].count -= 1;
+		}
+	}
+
+	return cbndx;
 }
 
 static void __arm_smmu_free_bitmap(unsigned long *map, int idx)
@@ -626,7 +652,8 @@ static void arm_smmu_write_context_bank(struct arm_smmu_device *smmu, int idx)
 }
 
 static int arm_smmu_init_domain_context(struct iommu_domain *domain,
-					struct arm_smmu_device *smmu)
+					struct arm_smmu_device *smmu,
+					struct device *dev)
 {
 	int irq, start, ret = 0;
 	unsigned long ias, oas;
@@ -740,8 +767,7 @@ static int arm_smmu_init_domain_context(struct iommu_domain *domain,
 		ret = -EINVAL;
 		goto out_unlock;
 	}
-	ret = __arm_smmu_alloc_bitmap(smmu->context_map, start,
-				      smmu->num_context_banks);
+	ret = __arm_smmu_alloc_cb(smmu, start, dev);
 	if (ret < 0)
 		goto out_unlock;
 
@@ -1135,7 +1161,7 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
 		return ret;
 
 	/* Ensure that the domain is finalised */
-	ret = arm_smmu_init_domain_context(domain, smmu);
+	ret = arm_smmu_init_domain_context(domain, smmu, dev);
 	if (ret < 0)
 		goto rpm_put;
 
@@ -1634,6 +1660,49 @@ static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
 	arm_smmu_gr0_write(smmu, ARM_SMMU_GR0_sCR0, reg);
 }
 
+static int arm_smmu_read_smr_state(struct arm_smmu_device *smmu)
+{
+	u32 smr, s2cr;
+	u32 mask;
+	u32 type;
+	u32 cbndx;
+	u32 privcfg;
+	u32 id;
+	int i;
+
+	for (i = 0; i < smmu->num_mapping_groups; i++) {
+		smr = readl_relaxed(smmu->base + ARM_SMMU_GR0_SMR(i));
+		mask = (smr >> SMR_MASK_SHIFT) & SMR_MASK_MASK;
+		id = smr & SMR_ID_MASK;
+		if (!(smr & SMR_VALID))
+			continue;
+
+		s2cr = readl_relaxed(smmu->base + ARM_SMMU_GR0_S2CR(i));
+		type = (s2cr >> S2CR_TYPE_SHIFT) & S2CR_TYPE_MASK;
+		cbndx = (s2cr >> S2CR_CBNDX_SHIFT) & S2CR_CBNDX_MASK;
+		privcfg = (s2cr >> S2CR_PRIVCFG_SHIFT) & S2CR_PRIVCFG_MASK;
+		if (type != S2CR_TYPE_TRANS)
+			continue;
+
+		smmu->smrs[i].mask = mask;
+		smmu->smrs[i].id = id;
+		smmu->smrs[i].valid = true;
+
+		smmu->s2crs[i].group = NULL;
+		smmu->s2crs[i].count = 1;
+		smmu->s2crs[i].type = type;
+		smmu->s2crs[i].privcfg = privcfg;
+		smmu->s2crs[i].cbndx = cbndx;
+		smmu->s2crs[i].handoff = true;
+
+		bitmap_set(smmu->context_map, cbndx, 1);
+
+		dev_err(smmu->dev, "Handoff smr: %x s2cr: %x cb: %d\n", smr, s2cr, cbndx);
+	}
+
+	return 0;
+}
+
 static int arm_smmu_id_size_to_bits(int size)
 {
 	switch (size) {
@@ -1847,8 +1916,10 @@ static int arm_smmu_device_cfg_probe(struct arm_smmu_device *smmu)
 		dev_notice(smmu->dev, "\tStage-2: %lu-bit IPA -> %lu-bit PA\n",
 			   smmu->ipa_size, smmu->pa_size);
 
-	if (smmu->impl && smmu->impl->cfg_probe)
-		return smmu->impl->cfg_probe(smmu);
+		
+	arm_smmu_read_smr_state(smmu);
+//	if (smmu->impl && smmu->impl->cfg_probe)
+//		return smmu->impl->cfg_probe(smmu);
 
 	return 0;
 }
