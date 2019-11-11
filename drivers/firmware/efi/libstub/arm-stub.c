@@ -170,8 +170,11 @@ unsigned long efi_entry(void *handle, efi_system_table_t *sys_table,
 
 	if (IS_ENABLED(CONFIG_CMDLINE_EXTEND) ||
 	    IS_ENABLED(CONFIG_CMDLINE_FORCE) ||
-	    cmdline_size == 0)
+	    cmdline_size == 0) {
 		efi_parse_options(CONFIG_CMDLINE);
+		cmdline_ptr = CONFIG_CMDLINE;
+		cmdline_size = strlen(CONFIG_CMDLINE);
+	}
 
 	if (!IS_ENABLED(CONFIG_CMDLINE_FORCE) && cmdline_size > 0)
 		efi_parse_options(cmdline_ptr);
