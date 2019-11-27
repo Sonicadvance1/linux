@@ -43,6 +43,10 @@
 #define SDM845_QSCRATCH_SIZE			0x400
 #define SDM845_DWC3_CORE_SIZE			0xcd00
 
+#define SDM8CX_QSCRATCH_BASE_OFFSET		0xf8800
+#define SDM8CX_QSCRATCH_SIZE			0x400
+#define SDM8CX_DWC3_CORE_SIZE			0x10000
+
 struct dwc3_acpi_pdata {
 	u32			qscratch_base_offset;
 	u32			qscratch_base_size;
@@ -331,12 +335,12 @@ static int dwc3_qcom_get_irq(struct platform_device *pdev,
 	return ret;
 }
 
-static int dwc3_qcom_setup_irq(struct platform_device *pdev)
+static int dwc3_qcom_setup_irq(struct platform_device *pdev, struct platform_device *child_pdev)
 {
 	struct dwc3_qcom *qcom = platform_get_drvdata(pdev);
 	const struct dwc3_acpi_pdata *pdata = qcom->acpi_pdata;
 	int irq, ret;
-	irq = dwc3_qcom_get_irq(pdev, "hs_phy_irq",
+	irq = dwc3_qcom_get_irq(child_pdev, "hs_phy_irq",
 				pdata ? pdata->hs_phy_irq_index : -1);
 	if (irq > 0) {
 		/* Keep wakeup interrupts disabled until suspend */
@@ -352,7 +356,7 @@ static int dwc3_qcom_setup_irq(struct platform_device *pdev)
 		qcom->hs_phy_irq = irq;
 	}
 
-	irq = dwc3_qcom_get_irq(pdev, "dp_hs_phy_irq",
+	irq = dwc3_qcom_get_irq(child_pdev, "dp_hs_phy_irq",
 				pdata ? pdata->dp_hs_phy_irq_index : -1);
 	if (irq > 0) {
 		irq_set_status_flags(irq, IRQ_NOAUTOEN);
@@ -367,7 +371,7 @@ static int dwc3_qcom_setup_irq(struct platform_device *pdev)
 		qcom->dp_hs_phy_irq = irq;
 	}
 
-	irq = dwc3_qcom_get_irq(pdev, "dm_hs_phy_irq",
+	irq = dwc3_qcom_get_irq(child_pdev, "dm_hs_phy_irq",
 				pdata ? pdata->dm_hs_phy_irq_index : -1);
 	if (irq > 0) {
 		irq_set_status_flags(irq, IRQ_NOAUTOEN);
@@ -382,7 +386,7 @@ static int dwc3_qcom_setup_irq(struct platform_device *pdev)
 		qcom->dm_hs_phy_irq = irq;
 	}
 
-	irq = dwc3_qcom_get_irq(pdev, "ss_phy_irq",
+	irq = dwc3_qcom_get_irq(child_pdev, "ss_phy_irq",
 				pdata ? pdata->ss_phy_irq_index : -1);
 	if (irq > 0) {
 		irq_set_status_flags(irq, IRQ_NOAUTOEN);
@@ -452,7 +456,7 @@ static const struct property_entry dwc3_qcom_acpi_properties[] = {
 	{}
 };
 
-static int dwc3_qcom_acpi_register_core(struct platform_device *pdev)
+static int dwc3_qcom_acpi_register_core(struct platform_device *pdev, struct platform_device *child_pdev)
 {
 	struct dwc3_qcom 	*qcom = platform_get_drvdata(pdev);
 	struct device		*dev = &pdev->dev;
@@ -486,7 +490,7 @@ static int dwc3_qcom_acpi_register_core(struct platform_device *pdev)
 	child_res[0].end = child_res[0].start +
 		qcom->acpi_pdata->dwc3_core_base_size;
 
-	irq = platform_get_irq(pdev, 0);
+	irq = platform_get_irq(child_pdev, 0);
 	child_res[1].flags = IORESOURCE_IRQ;
 	child_res[1].start = child_res[1].end = irq;
 
@@ -551,9 +555,9 @@ static const struct dwc3_acpi_pdata sdm845_acpi_pdata = {
 };
 
 static const struct dwc3_acpi_pdata sdm8cx_acpi_pdata = {
-	.qscratch_base_offset = SDM845_QSCRATCH_BASE_OFFSET,
-	.qscratch_base_size = SDM845_QSCRATCH_SIZE,
-	.dwc3_core_base_size = SDM845_DWC3_CORE_SIZE,
+	.qscratch_base_offset = SDM8CX_QSCRATCH_BASE_OFFSET,
+	.qscratch_base_size = SDM8CX_QSCRATCH_SIZE,
+	.dwc3_core_base_size = SDM8CX_DWC3_CORE_SIZE,
 	.hs_phy_irq_index = 1,
 	.dp_hs_phy_irq_index = 4,
 	.dm_hs_phy_irq_index = 3,
@@ -567,6 +571,11 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
 	struct device		*dev = &pdev->dev;
 	struct dwc3_qcom	*qcom;
 	struct resource		*res, *parent_res = NULL;
+	struct fwnode_handle	*dwc3_child;
+	struct acpi_device	*dwc3_child_dev;
+	struct platform_device	*child_pdev;
+	acpi_handle dwc3_acpi_top = ACPI_HANDLE(dev);
+	struct resource *r;
 	int			ret, i;
 	bool			ignore_pipe_clk;
 
@@ -578,6 +587,9 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
 	qcom->dev = &pdev->dev;
 
 	if (has_acpi_companion(dev)) {
+		dwc3_child = dev->fwnode->ops->get_next_child_node(dev->fwnode, NULL);
+		dwc3_child_dev = to_acpi_device_node(dwc3_child);
+		child_pdev = acpi_create_platform_device(dwc3_child_dev, NULL);
 		qcom->acpi_pdata = acpi_device_get_match_data(dev);
 		if (!qcom->acpi_pdata) {
 			dev_err(&pdev->dev, "no supporting ACPI device data\n");
@@ -634,10 +646,10 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
 		goto clk_disable;
 	}
 
-	ret = dwc3_qcom_setup_irq(pdev);
+	ret = dwc3_qcom_setup_irq(pdev, child_pdev);
 	if (ret) {
 		dev_err(dev, "failed to setup IRQs, err=%d\n", ret);
-		goto clk_disable;
+		//goto clk_disable;
 	}
 
 	/*
@@ -652,7 +664,7 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
 	if (np)
 		ret = dwc3_qcom_of_register_core(pdev);
 	else
-		ret = dwc3_qcom_acpi_register_core(pdev);
+		ret = dwc3_qcom_acpi_register_core(pdev, child_pdev);
 
 	if (ret) {
 		dev_err(dev, "failed to register DWC3 Core, err=%d\n", ret);
@@ -675,7 +687,6 @@ static int dwc3_qcom_probe(struct platform_device *pdev)
 	pm_runtime_set_active(dev);
 	pm_runtime_enable(dev);
 	pm_runtime_forbid(dev);
-
 	return 0;
 
 depopulate:
@@ -773,7 +784,7 @@ MODULE_DEVICE_TABLE(of, dwc3_qcom_of_match);
 static const struct acpi_device_id dwc3_qcom_acpi_match[] = {
 	{ "QCOM2430", (unsigned long)&sdm845_acpi_pdata },
 	// XXX: 0497 Fails to initialize due to missing host IRQ
-	// { "QCOM0497", (unsigned long)&sdm8cx_acpi_pdata },
+	{ "QCOM0497", (unsigned long)&sdm8cx_acpi_pdata },
 	{ },
 };
 MODULE_DEVICE_TABLE(acpi, dwc3_qcom_acpi_match);
