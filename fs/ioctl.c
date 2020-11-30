@@ -790,8 +790,8 @@ long compat_ptr_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 }
 EXPORT_SYMBOL(compat_ptr_ioctl);
 
-COMPAT_SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd,
-		       compat_ulong_t, arg)
+long do_ioctl32(unsigned int fd, unsigned int cmd,
+			compat_ulong_t arg)
 {
 	struct fd f = fdget(fd);
 	int error;
@@ -849,5 +849,17 @@ COMPAT_SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd,
 	fdput(f);
 
 	return error;
+}
+
+COMPAT_SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd,
+			compat_ulong_t, arg)
+{
+	return do_ioctl32(fd, cmd, arg);
+}
+
+SYSCALL_DEFINE3(ioctl32, unsigned int, fd, unsigned int, cmd,
+			compat_ulong_t, arg)
+{
+	return do_ioctl32(fd, cmd, arg);
 }
 #endif

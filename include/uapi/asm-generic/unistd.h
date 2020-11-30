@@ -862,8 +862,15 @@ __SYSCALL(__NR_process_madvise, sys_process_madvise)
 #define __NR_epoll_pwait2 441
 __SC_COMP(__NR_epoll_pwait2, sys_epoll_pwait2, compat_sys_epoll_pwait2)
 
+#define __NR_ioctl32 442
+#ifdef CONFIG_COMPAT
+__SC_COMP(__NR_ioctl32, sys_ioctl32, compat_sys_ioctl)
+#else
+__SC_COMP(__NR_ioctl32, sys_ni_syscall, sys_ni_syscall)
+#endif
+
 #undef __NR_syscalls
-#define __NR_syscalls 442
+#define __NR_syscalls 443
 
 /*
  * 32 bit systems traditionally used different

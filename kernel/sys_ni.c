@@ -302,6 +302,9 @@ COND_SYSCALL(recvmmsg_time32);
 COND_SYSCALL_COMPAT(recvmmsg_time32);
 COND_SYSCALL_COMPAT(recvmmsg_time64);
 
+COND_SYSCALL(ioctl32);
+COND_SYSCALL_COMPAT(ioctl32);
+
 /*
  * Architecture specific syscalls: see further below
  */
