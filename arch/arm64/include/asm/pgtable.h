@@ -982,6 +982,16 @@ static inline bool arch_faults_on_old_pte(void)
 }
 #define arch_faults_on_old_pte arch_faults_on_old_pte
 
+/*
+ * We provide our own arch_get_unmapped_area to handle 32-bit mmap calls from
+ * tango.
+ */
+#ifdef CONFIG_TANGO_BT
+#define HAVE_ARCH_UNMAPPED_AREA
+#define HAVE_ARCH_UNMAPPED_AREA_TOPDOWN
+#define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
+#endif
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __ASM_PGTABLE_H */

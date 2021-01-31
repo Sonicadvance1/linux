@@ -937,7 +937,7 @@ void fpsimd_release_task(struct task_struct *dead_task)
 void do_sve_acc(unsigned int esr, struct pt_regs *regs)
 {
 	/* Even if we chose not to use SVE, the hardware could still trap: */
-	if (unlikely(!system_supports_sve()) || WARN_ON(is_compat_task())) {
+	if (unlikely(!system_supports_sve()) || WARN_ON(is_aarch32_compat_task())) {
 		force_signal_inject(SIGILL, ILL_ILLOPC, regs->pc, 0);
 		return;
 	}

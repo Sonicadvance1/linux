@@ -180,13 +180,44 @@ struct compat_shmid64_ds {
 
 static inline int is_compat_task(void)
 {
+#ifdef CONFIG_COMPAT
+	/* It is compatible if Tango, 32bit compat, or 32bit thread */
+	return current_thread_info()->compat_syscall_flags != 0 || test_thread_flag(TIF_32BIT);
+#else
 	return test_thread_flag(TIF_32BIT);
+#endif
 }
 
 static inline int is_compat_thread(struct thread_info *thread)
 {
+#ifdef CONFIG_COMPAT
+	/* It is compatible if Tango, 32bit compat, or 32bit thread */
+	return thread->compat_syscall_flags != 0 || test_ti_thread_flag(thread, TIF_32BIT);
+#else
+ 	return test_ti_thread_flag(thread, TIF_32BIT);
+#endif
+}
+
+static inline int is_aarch32_compat_task(void)
+{
+	return test_thread_flag(TIF_32BIT);
+}
+
+static inline int is_aarch32_compat_thread(struct thread_info *thread)
+{
 	return test_ti_thread_flag(thread, TIF_32BIT);
 }
+
+#ifdef CONFIG_TANGO_BT
+static inline int is_tango_compat_task(void)
+{
+	return current_thread_info()->compat_syscall_flags & _TIF_COMPAT_TANGOSYSCALL;
+}
+static inline int is_tango_compat_thread(struct thread_info *thread)
+{
+	return thread->compat_syscall_flags & _TIF_COMPAT_TANGOSYSCALL;
+}
+#endif
 
 #else /* !CONFIG_COMPAT */
 

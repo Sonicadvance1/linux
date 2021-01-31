@@ -356,13 +356,13 @@ static void noinstr el0_dbg(struct pt_regs *regs, unsigned long esr)
 	local_daif_restore(DAIF_PROCCTX_NOIRQ);
 }
 
-static void noinstr el0_svc(struct pt_regs *regs)
+static void noinstr el0_svc(struct pt_regs *regs, unsigned int iss)
 {
 	if (system_uses_irq_prio_masking())
 		gic_write_pmr(GIC_PRIO_IRQON | GIC_PRIO_PSR_I_SET);
 
 	enter_from_user_mode();
-	do_el0_svc(regs);
+	do_el0_svc(regs, iss);
 }
 
 static void noinstr el0_fpac(struct pt_regs *regs, unsigned long esr)
@@ -378,7 +378,9 @@ asmlinkage void noinstr el0_sync_handler(struct pt_regs *regs)
 
 	switch (ESR_ELx_EC(esr)) {
 	case ESR_ELx_EC_SVC64:
-		el0_svc(regs);
+		/* Redundant masking here to show we are getting ISS mask
+		 * Then we are pulling the imm16 out of it for SVC64 */
+		el0_svc(regs, (esr & ESR_ELx_ISS_MASK) & 0xffff);
 		break;
 	case ESR_ELx_EC_DABT_LOW:
 		el0_da(regs, esr);

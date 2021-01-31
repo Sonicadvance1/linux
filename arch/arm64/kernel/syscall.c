@@ -22,7 +22,7 @@ static long do_ni_syscall(struct pt_regs *regs, int scno)
 {
 #ifdef CONFIG_COMPAT
 	long ret;
-	if (is_compat_task()) {
+	if (is_aarch32_compat_task()) {
 		ret = compat_arm_syscall(regs, scno);
 		if (ret != -ENOSYS)
 			return ret;
@@ -166,13 +166,20 @@ static void el0_svc_common(struct pt_regs *regs, int scno, int sc_nr,
 	if (!has_syscall_work(flags) && !IS_ENABLED(CONFIG_DEBUG_RSEQ)) {
 		local_daif_mask();
 		flags = current_thread_info()->flags;
-		if (!has_syscall_work(flags) && !(flags & _TIF_SINGLESTEP))
+		if (!has_syscall_work(flags) && !(flags & _TIF_SINGLESTEP)) {
+#ifdef CONFIG_COMPAT
+			current_thread_info()->compat_syscall_flags = 0;
+#endif
 			return;
+		}
 		local_daif_restore(DAIF_PROCCTX);
 	}
 
 trace_exit:
 	syscall_trace_exit(regs);
+#ifdef CONFIG_COMPAT
+	current_thread_info()->compat_syscall_flags = 0;
+#endif
 }
 
 static inline void sve_user_discard(void)
@@ -192,10 +199,27 @@ static inline void sve_user_discard(void)
 	sve_user_disable();
 }
 
-void do_el0_svc(struct pt_regs *regs)
+void do_el0_svc(struct pt_regs *regs, unsigned int iss)
 {
 	sve_user_discard();
-	el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
+	switch (iss) {
+#ifdef CONFIG_COMPAT
+	case 1:
+		current_thread_info()->compat_syscall_flags = _TIF_COMPAT_32BITSYSCALL;
+		el0_svc_common(regs, regs->regs[7], __NR_compat_syscalls,
+			       compat_sys_call_table);
+		break;
+#endif
+#ifdef CONFIG_TANGO_BT
+	case 2:
+		current_thread_info()->compat_syscall_flags = _TIF_COMPAT_TANGOSYSCALL;
+		el0_svc_common(regs, regs->regs[7], __NR_compat_syscalls,
+			       compat_sys_call_table);
+		break;
+#endif
+	default:
+		el0_svc_common(regs, regs->regs[8], __NR_syscalls, sys_call_table);
+	}
 }
 
 #ifdef CONFIG_COMPAT

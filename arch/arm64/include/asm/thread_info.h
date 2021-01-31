@@ -38,6 +38,9 @@ struct thread_info {
 #endif
 		} preempt;
 	};
+#ifdef CONFIG_COMPAT
+	int			compat_syscall_flags;	/* 32-bit compat syscall */
+#endif
 #ifdef CONFIG_SHADOW_CALL_STACK
 	void			*scs_base;
 	void			*scs_sp;
@@ -104,6 +107,12 @@ void arch_release_task_struct(struct task_struct *tsk);
 #define _TIF_SYSCALL_WORK	(_TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT | \
 				 _TIF_SYSCALL_TRACEPOINT | _TIF_SECCOMP | \
 				 _TIF_SYSCALL_EMU)
+
+#define TIF_COMPAT_32BITSYSCALL 0 /* Trivial 32bit compatible syscall */
+#define TIF_COMPAT_TANGOSYSCALL 1 /* Tango 32bit compatible syscall */
+
+#define _TIF_COMPAT_32BITSYSCALL (1 << TIF_COMPAT_32BITSYSCALL)
+#define _TIF_COMPAT_TANGOSYSCALL (1 << TIF_COMPAT_TANGOSYSCALL)
 
 #ifdef CONFIG_SHADOW_CALL_STACK
 #define INIT_SCS							\

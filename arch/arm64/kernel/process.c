@@ -314,7 +314,7 @@ static void tls_thread_flush(void)
 {
 	write_sysreg(0, tpidr_el0);
 
-	if (is_compat_task()) {
+	if (is_aarch32_compat_task()) {
 		current->thread.uw.tp_value = 0;
 
 		/*
@@ -409,7 +409,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
 		*task_user_tls(p) = read_sysreg(tpidr_el0);
 
 		if (stack_start) {
-			if (is_compat_thread(task_thread_info(p)))
+			if (is_aarch32_compat_thread(task_thread_info(p)))
 				childregs->compat_sp = stack_start;
 			else
 				childregs->sp = stack_start;
@@ -452,7 +452,7 @@ static void tls_thread_switch(struct task_struct *next)
 {
 	tls_preserve_current_state();
 
-	if (is_compat_thread(task_thread_info(next)))
+	if (is_aarch32_compat_thread(task_thread_info(next)))
 		write_sysreg(next->thread.uw.tp_value, tpidrro_el0);
 	else if (!arm64_kernel_unmapped_at_el0())
 		write_sysreg(0, tpidrro_el0);
@@ -606,7 +606,12 @@ unsigned long arch_align_stack(unsigned long sp)
  */
 void arch_setup_new_exec(void)
 {
-	current->mm->context.flags = is_compat_task() ? MMCF_AARCH32 : 0;
+#ifdef CONFIG_COMPAT
+	process_init_compat_mmap();
+	current_thread_info()->compat_syscall_flags = 0;
+#endif
+
+	current->mm->context.flags = is_aarch32_compat_task() ? MMCF_AARCH32 : 0;
 
 	ptrauth_thread_init_user(current);
 
