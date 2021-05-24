@@ -73,6 +73,7 @@ SYM_CODE_START(__kernel_rt_sigreturn)
 	mov	x8, #__NR_rt_sigreturn
 //	PLEASE DO NOT MODIFY
 	svc	#0
+SYM_INNER_LABEL(__kernel_vdso_sigreturn_landing_pad, SYM_L_GLOBAL)
 //	PLEASE DO NOT MODIFY
 //	.cfi_endproc
 SYM_CODE_END(__kernel_rt_sigreturn)
