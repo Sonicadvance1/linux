@@ -13,6 +13,7 @@
 #include <linux/kernel.h>
 #include <linux/sched/signal.h>
 #include <linux/sched/task_stack.h>
+#include <linux/syscall_user_dispatch.h>
 #include <linux/mm.h>
 #include <linux/nospec.h>
 #include <linux/smp.h>
@@ -1836,6 +1837,16 @@ int syscall_trace_enter(struct pt_regs *regs)
 {
 	unsigned long flags = READ_ONCE(current_thread_info()->flags);
 
+	/*
+	 * Handle Syscall User Dispatch.  This must comes first, since
+	 * the ABI here can be something that doesn't make sense for
+	 * other syscall_work features.
+	 */
+	if (flags & _TIF_SYSCALL_USER_DISPATCH) {
+		if (syscall_user_dispatch(regs))
+			return NO_SYSCALL;
+	}
+
 	if (flags & (_TIF_SYSCALL_EMU | _TIF_SYSCALL_TRACE)) {
 		tracehook_report_syscall(regs, PTRACE_SYSCALL_ENTER);
 		if (flags & _TIF_SYSCALL_EMU)
@@ -1858,6 +1869,19 @@ int syscall_trace_enter(struct pt_regs *regs)
 void syscall_trace_exit(struct pt_regs *regs)
 {
 	unsigned long flags = READ_ONCE(current_thread_info()->flags);
+
+	/*
+	 * If the syscall was rolled back due to syscall user dispatching,
+	 * then the tracers below are not invoked for the same reason as
+	 * the entry side was not invoked in syscall_trace_enter(): The ABI
+	 * of these syscalls is unknown.
+	 */
+	if (flags & _TIF_SYSCALL_USER_DISPATCH) {
+		if (unlikely(current->syscall_dispatch.on_dispatch)) {
+			current->syscall_dispatch.on_dispatch = false;
+			return;
+		}
+	}
 
 	audit_syscall_exit(regs);
 

@@ -15,6 +15,7 @@
 #include <asm/syscall.h>
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
+#include <asm/vdso.h>
 
 long compat_arm_syscall(struct pt_regs *regs, int scno);
 long sys_ni_syscall(void);
@@ -191,3 +192,11 @@ void do_el0_svc_compat(struct pt_regs *regs)
 		       compat_sys_call_table);
 }
 #endif
+
+bool arch_syscall_is_vdso_sigreturn(struct pt_regs *regs)
+{
+	if (regs->pc == (unsigned long)VDSO_SYMBOL(current->mm->context.vdso,
+		vdso_sigreturn_landing_pad))
+		return true;
+	return false;
+}

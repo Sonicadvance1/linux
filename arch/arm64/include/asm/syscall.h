@@ -94,4 +94,6 @@ static inline int syscall_get_arch(struct task_struct *task)
 	return AUDIT_ARCH_AARCH64;
 }
 
+extern bool arch_syscall_is_vdso_sigreturn(struct pt_regs *regs);
+
 #endif	/* __ASM_SYSCALL_H */
