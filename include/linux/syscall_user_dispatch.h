@@ -7,7 +7,7 @@
 
 #include <linux/thread_info.h>
 
-#ifdef CONFIG_GENERIC_ENTRY
+#ifdef CONFIG_SYSCALL_USER_DISPATCH
 
 struct syscall_user_dispatch {
 	char __user	*selector;
@@ -15,6 +15,8 @@ struct syscall_user_dispatch {
 	unsigned long	len;
 	bool		on_dispatch;
 };
+
+bool syscall_user_dispatch(struct pt_regs *regs);
 
 int set_syscall_user_dispatch(unsigned long mode, unsigned long offset,
 			      unsigned long len, char __user *selector);

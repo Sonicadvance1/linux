@@ -5,8 +5,7 @@
 #include <linux/highmem.h>
 #include <linux/livepatch.h>
 #include <linux/audit.h>
-
-#include "common.h"
+#include <linux/syscall_user_dispatch.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/syscalls.h>

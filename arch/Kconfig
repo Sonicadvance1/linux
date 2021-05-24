@@ -30,7 +30,11 @@ config SET_FS
 config HOTPLUG_SMT
 	bool
 
+config SYSCALL_USER_DISPATCH
+       bool
+
 config GENERIC_ENTRY
+       select SYSCALL_USER_DISPATCH
        bool
 
 config KPROBES
