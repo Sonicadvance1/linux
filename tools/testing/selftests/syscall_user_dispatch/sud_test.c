@@ -150,6 +150,15 @@ int si_errno;
 
 static void handle_sigsys(int sig, siginfo_t *info, void *ucontext)
 {
+#ifdef __aarch64__
+	/* This test expects the syscall number will be returned in r0
+	 * Copy it over from r8 which is the scnum in the ABI
+	 */
+	ucontext_t *_context = (ucontext_t *)ucontext;
+
+	_context->uc_mcontext.regs[0] = _context->uc_mcontext.regs[8];
+#endif
+
 	si_code = info->si_code;
 	si_errno = info->si_errno;
 
