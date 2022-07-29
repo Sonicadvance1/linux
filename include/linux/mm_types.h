@@ -474,6 +474,7 @@ struct mm_struct {
 #endif
 		unsigned long task_size;	/* size of task vm space */
 		unsigned long highest_vm_end;	/* highest vma end address */
+		unsigned long va_limit_start, va_limit_end;
 		pgd_t * pgd;
 
 #ifdef CONFIG_MEMBARRIER

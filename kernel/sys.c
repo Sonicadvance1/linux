@@ -2227,6 +2227,67 @@ out:
 	return error;
 }
 
+struct va_limits {
+	unsigned long begin;
+	unsigned long end;
+};
+static int prctl_va_limits(int opt, unsigned long addr,
+			unsigned long arg4, unsigned long arg5)
+{
+	struct mm_struct *mm = current->mm;
+	struct va_limits limits;
+	int error;
+
+	if (opt == PR_VA_LIMITS_SET) {
+		if (copy_from_user(&limits, (const void __user *)addr, sizeof(struct va_limits)))
+			return -EFAULT;
+
+		/*
+		 * Reject addresses outside of maximum kernel limits
+		 */
+		if (limits.end > TASK_SIZE || limits.begin < mmap_min_addr)
+			return -EINVAL;
+
+		/*
+		 * Don't allow overlapping or reversed limits
+		 */
+		if (limits.end <= limits.begin)
+			return -ERANGE;
+	}
+	else if (opt == PR_VA_LIMITS_OFF) {
+		clear_bit(MMF_HAS_LIMITED_VA, &mm->flags);
+		return 0;
+	}
+	else if (opt == PR_VA_LIMITS_ON) {
+		set_bit(MMF_HAS_LIMITED_VA, &mm->flags);
+		return 0;
+	}
+
+	error = -EINVAL;
+
+	mmap_read_lock(mm);
+	spin_lock(&mm->arg_lock);
+
+	if (opt == PR_VA_LIMITS_SET) {
+		mm->va_limit_start = limits.begin;
+		mm->va_limit_end = limits.end;
+	}
+	else {
+		limits.begin = mm->va_limit_start;
+		limits.end = mm->va_limit_end;
+		if (copy_to_user((char __user *)addr, &limits, sizeof(struct va_limits))) {
+			error = -EFAULT;
+			goto out;
+		}
+	}
+
+	error = 0;
+out:
+	spin_unlock(&mm->arg_lock);
+	mmap_read_unlock(mm);
+	return error;
+}
+
 #ifdef CONFIG_CHECKPOINT_RESTORE
 static int prctl_get_tid_address(struct task_struct *me, int __user * __user *tid_addr)
 {
@@ -2603,6 +2664,9 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		error = sched_core_share_pid(arg2, arg3, arg4, arg5);
 		break;
 #endif
+	case PR_VA_LIMITS:
+		error = prctl_va_limits(arg2, arg3, arg4, arg5);
+		break;
 	case PR_SET_VMA:
 		error = prctl_set_vma(arg2, arg3, arg4, arg5);
 		break;

@@ -272,6 +272,14 @@ struct prctl_mm_map {
 # define PR_SCHED_CORE_SCOPE_THREAD_GROUP	1
 # define PR_SCHED_CORE_SCOPE_PROCESS_GROUP	2
 
+/* Virtual address range limitations */
+#define PR_VA_LIMITS 63
+# define PR_VA_LIMITS_GET 0
+# define PR_VA_LIMITS_SET 1
+# define PR_VA_LIMITS_OFF 2
+# define PR_VA_LIMITS_ON  3
+
+
 #define PR_SET_VMA		0x53564d41
 # define PR_SET_VMA_ANON_NAME		0
 

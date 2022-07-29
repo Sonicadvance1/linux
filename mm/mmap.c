@@ -2165,8 +2165,10 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 
 	info.flags = 0;
 	info.length = len;
-	info.low_limit = mm->mmap_base;
-	info.high_limit = mmap_end;
+      // info.low_limit = mm->mmap_base;
+      // info.high_limit = mmap_end;
+	info.low_limit = mm->va_limit_start;
+	info.high_limit = mm->va_limit_end;
 	info.align_mask = 0;
 	info.align_offset = 0;
 	return vm_unmapped_area(&info);
@@ -2205,25 +2207,36 @@ arch_get_unmapped_area_topdown(struct file *filp, unsigned long addr,
 			return addr;
 	}
 
-	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
-	info.length = len;
-	info.low_limit = max(PAGE_SIZE, mmap_min_addr);
-	info.high_limit = arch_get_mmap_base(addr, mm->mmap_base);
-	info.align_mask = 0;
-	info.align_offset = 0;
-	addr = vm_unmapped_area(&info);
+	if (likely(!test_bit(MMF_HAS_LIMITED_VA, &mm->flags))) {
+		info.flags = VM_UNMAPPED_AREA_TOPDOWN;
+		info.length = len;
+		info.low_limit = max(PAGE_SIZE, mmap_min_addr);
+		info.high_limit = arch_get_mmap_base(addr, mm->mmap_base);
+		info.align_mask = 0;
+		info.align_offset = 0;
+		addr = vm_unmapped_area(&info);
 
-	/*
-	 * A failed mmap() very likely causes application failure,
-	 * so fall back to the bottom-up function here. This scenario
-	 * can happen with large stack limits and large mmap()
-	 * allocations.
-	 */
-	if (offset_in_page(addr)) {
-		VM_BUG_ON(addr != -ENOMEM);
-		info.flags = 0;
-		info.low_limit = TASK_UNMAPPED_BASE;
-		info.high_limit = mmap_end;
+		/*
+		 * A failed mmap() very likely causes application failure,
+		 * so fall back to the bottom-up function here. This scenario
+		 * can happen with large stack limits and large mmap()
+		 * allocations.
+		 */
+		if (offset_in_page(addr)) {
+			VM_BUG_ON(addr != -ENOMEM);
+			info.flags = 0;
+			info.low_limit = TASK_UNMAPPED_BASE;
+			info.high_limit = mmap_end;
+			addr = vm_unmapped_area(&info);
+		}
+	}
+	else {
+		info.flags = VM_UNMAPPED_AREA_TOPDOWN;
+		info.length = len;
+		info.low_limit = max(PAGE_SIZE, mm->va_limit_start);
+		info.high_limit = mm->va_limit_end;
+		info.align_mask = 0;
+		info.align_offset = 0;
 		addr = vm_unmapped_area(&info);
 	}
 
