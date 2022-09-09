@@ -237,6 +237,9 @@ static struct clk_hw *qcom_cc_clk_hw_get(struct of_phandle_args *clkspec,
 int qcom_cc_really_probe(struct platform_device *pdev,
 			 const struct qcom_cc_desc *desc, struct regmap *regmap)
 {
+
+	pr_err("[gpucc][sc8280xp] Really probe time\n");
+
 	int i, ret;
 	struct device *dev = &pdev->dev;
 	struct qcom_reset_controller *reset;

@@ -424,9 +424,13 @@ static int gpu_cc_sc8280xp_probe(struct platform_device *pdev)
 {
 	struct regmap *regmap;
 
+	pr_err("[gpucc] sc8280xp probing\n");
 	regmap = qcom_cc_map(pdev, &gpu_cc_sc8280xp_desc);
 	if (IS_ERR(regmap))
+	{
+		pr_err("[gpucc][sc8280xp] Has register map error\n");
 		return PTR_ERR(regmap);
+	}
 
 	clk_lucid_pll_configure(&gpu_cc_pll0, regmap, &gpu_cc_pll0_config);
 	clk_lucid_pll_configure(&gpu_cc_pll1, regmap, &gpu_cc_pll1_config);
@@ -454,7 +458,18 @@ static struct platform_driver gpu_cc_sc8280xp_driver = {
 		.of_match_table = gpu_cc_sc8280xp_match_table,
 	},
 };
-module_platform_driver(gpu_cc_sc8280xp_driver);
+
+static int __init gpu_cc_sm8280_init(void)
+{
+	return platform_driver_register(&gpu_cc_sc8280xp_driver);
+}
+subsys_initcall(gpu_cc_sm8280_init);
+
+static void __exit gpu_cc_sm8280_exit(void)
+{
+	platform_driver_unregister(&gpu_cc_sc8280xp_driver);
+}
+module_exit(gpu_cc_sm8280_exit);
 
 MODULE_DESCRIPTION("Qualcomm SC8280XP GPU clock controller");
 MODULE_LICENSE("GPL");

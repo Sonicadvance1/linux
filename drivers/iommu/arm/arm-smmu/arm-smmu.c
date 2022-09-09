@@ -2130,6 +2130,8 @@ static int arm_smmu_device_probe(struct platform_device *pdev)
 		err = arm_smmu_device_dt_probe(smmu, &global_irqs, &pmu_irqs);
 	else
 		err = arm_smmu_device_acpi_probe(smmu, &global_irqs, &pmu_irqs);
+
+	dev_err(dev, "[smmu] Probe returned: %d\n", err);
 	if (err)
 		return err;
 
